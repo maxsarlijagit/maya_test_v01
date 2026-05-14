@@ -51,6 +51,16 @@ Example:
 hero_robot_uv_optimize_v1.2.3+4_20270513_231500.json
 ```
 
+## Tool catalog dashboard (web)
+
+Registro local de herramientas (técnico + producción) y generación asistida por API compatible con OpenAI.
+
+```bash
+cd dashboard && npm install && npm run dev
+```
+
+El catálogo se persiste en `localStorage`; usa **Exportar JSON** para backup o para guardar un snapshot en el repo. Referencias de APIs por DCC: `docs/api-references/`.
+
 ## Development
 
 Run tests:
