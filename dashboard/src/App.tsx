@@ -18,43 +18,28 @@ import {
 
 type Tab = 'catalog' | 'create' | 'docs'
 
-function useDarkMode() {
-  const [dark, setDark] = useState(() =>
-    typeof document !== 'undefined'
-      ? document.documentElement.classList.contains('dark')
-      : false
-  )
+function useSystemStatus() {
+  const [uptime, setUptime] = useState(0)
+  const [cpu, setCpu] = useState(0)
 
   useEffect(() => {
-    const saved = localStorage.getItem('dcc-catalog-dark')
-    if (saved === '1') {
-      document.documentElement.classList.add('dark')
-      setDark(true)
-    } else if (saved === '0') {
-      document.documentElement.classList.remove('dark')
-      setDark(false)
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.classList.add('dark')
-      setDark(true)
-    }
+    const timer = setInterval(() => {
+      setUptime((u) => u + 1)
+      setCpu(Math.floor(Math.random() * 15) + 5)
+    }, 1000)
+    return () => clearInterval(timer)
   }, [])
 
-  const toggle = () => {
-    document.documentElement.classList.toggle('dark')
-    const isDark = document.documentElement.classList.contains('dark')
-    setDark(isDark)
-    localStorage.setItem('dcc-catalog-dark', isDark ? '1' : '0')
-  }
-
-  return { dark, toggle }
+  return { uptime, cpu }
 }
 
 export default function App() {
-  const { dark, toggle } = useDarkMode()
   const [tab, setTab] = useState<Tab>('catalog')
   const [tools, setTools] = useState<ToolRecord[]>(() => loadCatalog())
   const [filter, setFilter] = useState('')
   const [platformFilter, setPlatformFilter] = useState<Platform | ''>('')
+  const { uptime, cpu } = useSystemStatus()
+  const [isAlertMode, setIsAlertMode] = useState(false)
 
   const [draft, setDraft] = useState<Partial<ToolRecord>>(() => ({
     name: '',
@@ -137,7 +122,7 @@ export default function App() {
     const name = (draft.name || '').trim() || 'Nueva herramienta'
     const platform = (draft.platform as Platform) || 'maya'
     if (!aiKey.trim()) {
-      setAiError('Indica una API key (solo en este navegador; no se guarda en el catálogo).')
+      setAiError('ERROR: API KEY MISSING. ACCESS DENIED.')
       return
     }
     setAiLoading(true)
@@ -153,7 +138,7 @@ export default function App() {
       const text = await callChatCompletions(
         { baseUrl: aiBaseUrl, apiKey: aiKey.trim(), model: aiModel },
         userPrompt,
-        'Respondes siempre en español, Markdown claro, sin rodeos.'
+        'Respondes siempre en español, Markdown claro, estilo terminal futurista.'
       )
       setDraft((d) => ({ ...d, aiGeneratedSpec: text }))
     } catch (err) {
@@ -167,7 +152,7 @@ export default function App() {
     const blob = new Blob([exportCatalogJson(tools)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `dcc-tool-catalog-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `mission-data-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(a.href)
   }
@@ -189,48 +174,71 @@ export default function App() {
   const platforms = Object.entries(PLATFORM_LABELS) as [Platform, string][]
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-zinc-200 bg-[rgb(var(--surface-elevated))] dark:border-zinc-700">
+    <div className="min-h-screen relative">
+      <div className="scanline"></div>
+
+      <header className="border-b border-[rgba(0,255,242,0.3)] bg-[rgba(10,12,16,0.9)] sticky top-0 z-50">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-5">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              Pipeline / TD
-            </p>
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Catálogo de herramientas
-            </h1>
-            <p className="mt-1 max-w-xl text-sm text-zinc-600 dark:text-zinc-400">
-              Registro técnico y de producción; creación orientada a Maya, Blender, Painter, 3ds Max y
-              Unreal, con generación asistida por API compatible con OpenAI.
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 border-2 border-[rgb(var(--accent))] flex items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-[rgb(var(--accent))] opacity-10 animate-pulse"></div>
+                <span className="text-2xl font-bold">M</span>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[rgb(var(--accent))] opacity-70">
+                // SYSTEM_CONTROL_INTERFACE_V2.0.27
+              </p>
+              <h1 className="text-2xl font-black tracking-tighter text-white glitch-text">
+                HUD_CENTRAL
+              </h1>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={toggle}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
-          >
-            {dark ? 'Modo claro' : 'Modo oscuro'}
-          </button>
+
+          <div className="flex gap-8 text-[10px] font-mono text-[rgb(var(--accent))]">
+            <button
+              onClick={() => {
+                setIsAlertMode(!isAlertMode);
+                document.documentElement.style.setProperty('--accent', isAlertMode ? '0 255 242' : '255 60 60');
+                document.documentElement.style.setProperty('--border', isAlertMode ? '0 255 242' : '255 60 60');
+              }}
+              className="px-3 py-1 border border-[rgb(var(--accent))] text-[9px] hover:bg-[rgb(var(--accent))] hover:text-black transition-colors"
+            >
+              {isAlertMode ? '[ MODO_NORMAL ]' : '[ MODO_ALERTA ]'}
+            </button>
+            <div className="flex flex-col border-l border-[rgba(0,255,242,0.3)] pl-4">
+                <span className="opacity-50">TIEMPO_ACTIVO</span>
+                <span className="text-sm font-bold">{String(Math.floor(uptime/60)).padStart(2,'0')}:{String(uptime%60).padStart(2,'0')}:00</span>
+            </div>
+            <div className="flex flex-col border-l border-[rgba(0,255,242,0.3)] pl-4">
+                <span className="opacity-50">CARGA_SIS</span>
+                <span className="text-sm font-bold">{cpu}%</span>
+            </div>
+            <div className="flex flex-col border-l border-[rgba(0,255,242,0.3)] pl-4">
+                <span className="opacity-50">UBICACIÓN</span>
+                <span className="text-sm font-bold">COLONIA_MARTE_01</span>
+            </div>
+          </div>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-2 px-6 pb-4">
+
+        <nav className="mx-auto flex max-w-6xl gap-4 px-6 pb-4">
           {(
             [
-              ['catalog', 'Catálogo'],
-              ['create', 'Nueva herramienta'],
-              ['docs', 'Referencias API (local)'],
+              ['catalog', 'MANIFIESTO'],
+              ['create', 'NUEVO_REGISTRO'],
+              ['docs', 'ARCHIVOS'],
             ] as const
           ).map(([id, label]) => (
             <button
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+              className={`px-4 py-1 text-xs font-bold transition-all relative overflow-hidden border ${
                 tab === id
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                  ? 'bg-[rgb(var(--accent))] text-black border-[rgb(var(--accent))]'
+                  : 'text-[rgb(var(--accent))] border-[rgba(0,255,242,0.3)] hover:bg-[rgba(0,255,242,0.1)]'
               }`}
             >
-              {label}
+              [{label}]
             </button>
           ))}
         </nav>
@@ -239,27 +247,27 @@ export default function App() {
       <main className="mx-auto max-w-6xl px-6 py-8">
         {tab === 'catalog' && (
           <section className="space-y-6">
-            <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-wrap items-end gap-4 p-4 hud-panel">
               <label className="flex min-w-[200px] flex-1 flex-col gap-2">
-                <span className="text-xs font-medium text-zinc-500">Buscar</span>
+                <span className="text-[10px] font-bold text-[rgb(var(--accent))] opacity-70">CONSULTA_BÚSQUEDA</span>
                 <input
-                  className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                  className="px-3 py-2 text-sm font-mono"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
-                  placeholder="Nombre, notas, API…"
+                  placeholder="FILTRAR POR NOMBRE, NOTAS, API..."
                 />
               </label>
               <label className="flex w-48 flex-col gap-2">
-                <span className="text-xs font-medium text-zinc-500">Plataforma</span>
+                <span className="text-[10px] font-bold text-[rgb(var(--accent))] opacity-70">PLATAFORMA_OBJETIVO</span>
                 <select
-                  className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                  className="px-3 py-2 text-sm font-mono"
                   value={platformFilter}
                   onChange={(e) => setPlatformFilter((e.target.value || '') as Platform | '')}
                 >
-                  <option value="">Todas</option>
+                  <option value="">TODOS_LOS_SISTEMAS</option>
                   {platforms.map(([k, v]) => (
                     <option key={k} value={k}>
-                      {v}
+                      {v.toUpperCase()}
                     </option>
                   ))}
                 </select>
@@ -268,12 +276,12 @@ export default function App() {
                 <button
                   type="button"
                   onClick={downloadExport}
-                  className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium dark:border-zinc-600 dark:bg-zinc-800"
+                  className="border border-[rgba(0,255,242,0.5)] px-4 py-2 text-xs font-bold text-[rgb(var(--accent))] hover:bg-[rgb(var(--accent))] hover:text-black"
                 >
-                  Exportar JSON
+                  EXPORTAR_DATOS
                 </button>
-                <label className="cursor-pointer rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium dark:border-zinc-600 dark:bg-zinc-800">
-                  Importar JSON
+                <label className="cursor-pointer border border-[rgba(0,255,242,0.5)] px-4 py-2 text-xs font-bold text-[rgb(var(--accent))] hover:bg-[rgb(var(--accent))] hover:text-black">
+                  IMPORTAR_DATOS
                   <input
                     type="file"
                     accept="application/json,.json"
@@ -284,86 +292,71 @@ export default function App() {
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-              <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
-                    <th className="p-3 font-medium">Nombre</th>
-                    <th className="p-3 font-medium">Plataforma</th>
-                    <th className="p-3 font-medium">Maya</th>
-                    <th className="p-3 font-medium">API / entry</th>
-                    <th className="p-3 font-medium">Producción</th>
-                    <th className="p-3 font-medium w-24"></th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {filtered.length === 0 && (
-                    <tr>
-                      <td className="p-6 text-zinc-500" colSpan={6}>
-                        No hay herramientas que coincidan. Usa «Nueva herramienta» para registrar la
-                        primera.
-                      </td>
-                    </tr>
+                    <div className="col-span-full p-12 text-center border border-dashed border-[rgba(0,255,242,0.3)]">
+                      <p className="text-[rgb(var(--accent))] opacity-50 font-mono italic">
+                        NO_SE_ENCONTRARON_REGISTROS_EN_EL_MANIFIESTO
+                      </p>
+                    </div>
                   )}
                   {filtered.map((t) => (
-                    <tr
-                      key={t.id}
-                      className="border-b border-zinc-100 last:border-0 dark:border-zinc-800"
-                    >
-                      <td className="p-3 font-medium text-zinc-900 dark:text-zinc-100">{t.name}</td>
-                      <td className="p-3 text-zinc-600 dark:text-zinc-300">
-                        {PLATFORM_LABELS[t.platform]}
-                      </td>
-                      <td className="p-3 text-zinc-500">
-                        {t.platform === 'maya' ? t.mayaVersion ?? '—' : '—'}
-                      </td>
-                      <td className="p-3 text-zinc-600 dark:text-zinc-400">
-                        <div className="line-clamp-2 max-w-xs">
-                          {t.technical.apiSurface || '—'}
-                          {t.technical.entryPoints ? ` · ${t.technical.entryPoints}` : ''}
+                    <div key={t.id} className="hud-card group">
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="text-[10px] font-mono text-[rgb(var(--accent))] opacity-50">#{t.id.slice(0,8)}</span>
+                            <span className="px-2 py-0.5 bg-[rgb(var(--accent-soft))] text-[rgb(var(--accent))] text-[9px] font-bold">
+                                {PLATFORM_LABELS[t.platform].toUpperCase()}
+                            </span>
                         </div>
-                      </td>
-                      <td className="p-3 text-zinc-600 dark:text-zinc-400">
-                        <div className="line-clamp-2 max-w-xs">
-                          {t.production.pipelineStage || '—'}
-                          {t.production.owner ? ` · ${t.production.owner}` : ''}
+                        <h3 className="text-lg font-bold mb-2 group-hover:text-[rgb(var(--accent))] transition-colors">{t.name}</h3>
+                        <p className="text-xs text-[rgb(var(--muted))] line-clamp-2 mb-4 h-8">
+                            {t.notes || "SIN_DESCRIPCIÓN_DISPONIBLE"}
+                        </p>
+
+                        <div className="space-y-2 border-t border-[rgba(0,255,242,0.1)] pt-4">
+                            <div className="flex justify-between text-[10px]">
+                                <span className="opacity-50">SUPERFICIE_API</span>
+                                <span className="font-bold">{t.technical.apiSurface || "N/A"}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px]">
+                                <span className="opacity-50">ETAPA</span>
+                                <span className="font-bold">{t.production.pipelineStage || "N/A"}</span>
+                            </div>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <button
-                          type="button"
-                          className="text-rose-600 text-sm hover:underline dark:text-rose-400"
-                          onClick={() => removeTool(t.id)}
-                        >
-                          Eliminar
-                        </button>
-                      </td>
-                    </tr>
+
+                        <div className="mt-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                type="button"
+                                className="text-[rgb(var(--danger))] text-[9px] font-bold hover:underline"
+                                onClick={() => removeTool(t.id)}
+                            >
+                                [ TERMINAR_REGISTRO ]
+                            </button>
+                        </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
             </div>
           </section>
         )}
 
         {tab === 'create' && (
-          <section className="space-y-8">
+          <section className="space-y-8 max-w-4xl mx-auto">
             <form onSubmit={onSubmitCreate} className="space-y-8">
-              <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-6 md:grid-cols-2 p-6 hud-panel">
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs font-medium text-zinc-500">Nombre de la herramienta *</span>
+                  <span className="text-[10px] font-bold text-[rgb(var(--accent))] opacity-70">NOMBRE_ENTRADA *</span>
                   <input
                     required
-                    className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                    className="px-3 py-2 text-sm font-mono"
                     value={draft.name ?? ''}
                     onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                    placeholder="ej. UV Path Optimizer"
+                    placeholder="EJ. UV_SCANNER_v1"
                   />
                 </label>
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs font-medium text-zinc-500">Plataforma *</span>
+                  <span className="text-[10px] font-bold text-[rgb(var(--accent))] opacity-70">SISTEMA_PLATAFORMA *</span>
                   <select
-                    className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                    className="px-3 py-2 text-sm font-mono"
                     value={draft.platform}
                     onChange={(e) =>
                       setDraft((d) => ({ ...d, platform: e.target.value as Platform }))
@@ -371,16 +364,16 @@ export default function App() {
                   >
                     {platforms.map(([k, v]) => (
                       <option key={k} value={k}>
-                        {v}
+                        {v.toUpperCase()}
                       </option>
                     ))}
                   </select>
                 </label>
                 {draft.platform === 'maya' && (
                   <label className="flex flex-col gap-2">
-                    <span className="text-xs font-medium text-zinc-500">Versión de Maya</span>
+                    <span className="text-[10px] font-bold text-[rgb(var(--accent))] opacity-70">VERSIÓN_RUNTIME_MAYA</span>
                     <select
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                      className="px-3 py-2 text-sm font-mono"
                       value={draft.mayaVersion ?? '2027'}
                       onChange={(e) => setDraft((d) => ({ ...d, mayaVersion: e.target.value }))}
                     >
@@ -394,16 +387,14 @@ export default function App() {
                 )}
               </div>
 
-              <div>
-                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                  Bloque técnico
+              <div className="p-6 hud-panel">
+                <h2 className="text-sm font-bold text-[rgb(var(--accent))] mb-4 flex items-center gap-2">
+                    <div className="w-1 h-4 bg-[rgb(var(--accent))]"></div>
+                    ESPECIFICACIONES_TÉCNICAS
                 </h2>
-                <p className="mt-1 text-sm text-zinc-500">
-                  Superficies API, puntos de entrada y pruebas (alineado al código y al TD).
-                </p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   <Field
-                    label="Superficie API (cmds, bpy, pymxs, unreal…)"
+                    label="INTERFAZ_API"
                     value={draft.technical?.apiSurface ?? ''}
                     onChange={(v) =>
                       setDraft((d) => ({
@@ -413,7 +404,7 @@ export default function App() {
                     }
                   />
                   <Field
-                    label="Entry points"
+                    label="VECTORES_ENTRADA"
                     value={draft.technical?.entryPoints ?? ''}
                     onChange={(v) =>
                       setDraft((d) => ({
@@ -422,171 +413,85 @@ export default function App() {
                       }))
                     }
                   />
-                  <Field
-                    label="Dependencias"
-                    value={draft.technical?.dependencies ?? ''}
-                    onChange={(v) =>
-                      setDraft((d) => ({
-                        ...d,
-                        technical: { ...DEFAULT_TECHNICAL(), ...d.technical, dependencies: v },
-                      }))
-                    }
-                  />
-                  <Field
-                    label="Estrategia de tests"
-                    value={draft.technical?.testStrategy ?? ''}
-                    onChange={(v) =>
-                      setDraft((d) => ({
-                        ...d,
-                        technical: { ...DEFAULT_TECHNICAL(), ...d.technical, testStrategy: v },
-                      }))
-                    }
-                  />
                 </div>
               </div>
 
-              <div>
-                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                  Bloque producción
-                </h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <Field
-                    label="Owner / equipo"
-                    value={draft.production?.owner ?? ''}
-                    onChange={(v) =>
-                      setDraft((d) => ({
-                        ...d,
-                        production: { ...DEFAULT_PRODUCTION(), ...d.production, owner: v },
-                      }))
-                    }
-                  />
-                  <Field
-                    label="Etapa de pipeline"
-                    value={draft.production?.pipelineStage ?? ''}
-                    onChange={(v) =>
-                      setDraft((d) => ({
-                        ...d,
-                        production: { ...DEFAULT_PRODUCTION(), ...d.production, pipelineStage: v },
-                      }))
-                    }
-                  />
-                  <Field
-                    label="Notas QA"
-                    value={draft.production?.qaNotes ?? ''}
-                    onChange={(v) =>
-                      setDraft((d) => ({
-                        ...d,
-                        production: { ...DEFAULT_PRODUCTION(), ...d.production, qaNotes: v },
-                      }))
-                    }
-                  />
-                  <Field
-                    label="Canal de release"
-                    value={draft.production?.releaseChannel ?? ''}
-                    onChange={(v) =>
-                      setDraft((d) => ({
-                        ...d,
-                        production: { ...DEFAULT_PRODUCTION(), ...d.production, releaseChannel: v },
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-xs font-medium text-zinc-500">Notas libres</span>
-                <textarea
-                  className="min-h-[88px] rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
-                  value={draft.notes ?? ''}
-                  onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-                />
-              </label>
-
-              <div className="rounded-xl border border-indigo-200 bg-[rgb(var(--accent-soft))] p-6 dark:border-indigo-900/50">
-                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                  Generación con IA (API compatible OpenAI)
-                </h2>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  La clave no se almacena: solo se usa en esta sesión del navegador para la petición.
-                  Puedes usar un proxy compatible (misma forma de <code className="text-xs">/v1/chat/completions</code>
-                  ).
-                </p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="p-6 hud-panel border-[rgba(0,255,242,0.1)]">
+                <h2 className="text-[10px] font-bold text-[rgb(var(--accent))] mb-4 opacity-70">MÓDULO_DISEÑO_COGNITIVO (IA)</h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="md:col-span-2 flex flex-col gap-2">
+                    <span className="text-[10px] font-bold opacity-50">PROMPT_INTENCIÓN</span>
+                    <textarea
+                      className="min-h-[80px] px-3 py-2 text-sm font-mono"
+                      value={userIntent}
+                      onChange={(e) => setUserIntent(e.target.value)}
+                      placeholder="DESCRIBA LOS OBJETIVOS DE LA MISIÓN..."
+                    />
+                  </label>
                   <label className="flex flex-col gap-2">
-                    <span className="text-xs font-medium text-zinc-500">Base URL</span>
+                    <span className="text-[10px] font-bold opacity-50">URL_BASE</span>
                     <input
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                      className="px-3 py-2 text-sm font-mono"
                       value={aiBaseUrl}
                       onChange={(e) => setAiBaseUrl(e.target.value)}
                     />
                   </label>
                   <label className="flex flex-col gap-2">
-                    <span className="text-xs font-medium text-zinc-500">Modelo</span>
+                    <span className="text-[10px] font-bold opacity-50">MODELO_NEURAL</span>
                     <input
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                      className="px-3 py-2 text-sm font-mono"
                       value={aiModel}
                       onChange={(e) => setAiModel(e.target.value)}
                     />
                   </label>
-                  <label className="md:col-span-2 flex flex-col gap-2">
-                    <span className="text-xs font-medium text-zinc-500">API key</span>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-[10px] font-bold opacity-50">TOKEN_ACCESO</span>
                     <input
                       type="password"
                       autoComplete="off"
-                      className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                      className="px-3 py-2 text-sm font-mono"
                       value={aiKey}
                       onChange={(e) => setAiKey(e.target.value)}
-                      placeholder="sk-…"
-                    />
-                  </label>
-                  <label className="md:col-span-2 flex flex-col gap-2">
-                    <span className="text-xs font-medium text-zinc-500">
-                      Intención / descripción para el diseño
-                    </span>
-                    <textarea
-                      className="min-h-[80px] rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
-                      value={userIntent}
-                      onChange={(e) => setUserIntent(e.target.value)}
-                      placeholder="Qué debe hacer la herramienta, restricciones, integración con el resto del pipe…"
+                      placeholder="SK-XXXX..."
                     />
                   </label>
                 </div>
                 {aiError && (
-                  <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{aiError}</p>
+                  <p className="mt-3 text-[10px] font-bold text-[rgb(var(--danger))] animate-pulse">{aiError}</p>
                 )}
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={runAi}
                     disabled={aiLoading}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                    className="bg-[rgb(var(--accent))] text-black px-6 py-2 text-xs font-black shadow-[0_0_15px_rgba(var(--accent),0.4)] hover:shadow-[0_0_25px_rgba(var(--accent),0.6)] disabled:opacity-50"
                   >
-                    {aiLoading ? 'Generando…' : 'Generar diseño (Markdown)'}
+                    {aiLoading ? 'COMUNICANDO...' : 'EJECUTAR_DISEÑO_IA'}
                   </button>
                 </div>
                 {draft.aiGeneratedSpec && (
-                  <div className="mt-6">
-                    <p className="text-xs font-medium text-zinc-500">Salida (se guarda al registrar)</p>
-                    <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-zinc-200 bg-white p-4 text-left text-xs leading-relaxed dark:border-zinc-600 dark:bg-zinc-950">
+                  <div className="mt-6 border-t border-[rgba(0,255,242,0.2)] pt-4">
+                    <p className="text-[10px] font-bold text-[rgb(var(--accent))] mb-2">LOG_SALIDA_NEURAL:</p>
+                    <pre className={`mt-2 max-h-80 overflow-auto ai-terminal p-4 text-[10px] font-mono leading-relaxed text-[rgb(var(--accent))] ${aiLoading ? 'ai-processing' : ''}`}>
                       {draft.aiGeneratedSpec}
                     </pre>
                   </div>
                 )}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button
                   type="submit"
-                  className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="bg-white text-black px-8 py-3 text-sm font-black hover:bg-[rgb(var(--accent))] transition-colors"
                 >
-                  Guardar en catálogo
+                  GUARDAR_EN_MANIFIESTO
                 </button>
                 <button
                   type="button"
                   onClick={() => setTab('catalog')}
-                  className="rounded-lg border border-zinc-300 px-5 py-2.5 text-sm dark:border-zinc-600"
+                  className="border border-[rgba(255,255,255,0.3)] px-8 py-3 text-sm font-bold text-white hover:border-white"
                 >
-                  Cancelar
+                  ABORTAR
                 </button>
               </div>
             </form>
@@ -594,41 +499,36 @@ export default function App() {
         )}
 
         {tab === 'docs' && (
-          <section className="max-w-none">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              Documentación en el repositorio
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Ruta base: <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs dark:bg-zinc-800">docs/api-references/</code>.
-              Abre los archivos en el IDE o enlázalos desde la wiki interna.
-            </p>
-            <ul className="mt-6 list-disc space-y-3 pl-6 text-sm text-zinc-700 dark:text-zinc-300">
-              <li>
-                <code className="text-xs">maya.md</code> — Maya Python / MEL / API por versión
-              </li>
-              <li>
-                <code className="text-xs">blender.md</code> — bpy
-              </li>
-              <li>
-                <code className="text-xs">substance-painter.md</code> — Painter Python
-              </li>
-              <li>
-                <code className="text-xs">3ds-max.md</code> — pymxs / MAXScript
-              </li>
-              <li>
-                <code className="text-xs">unreal-engine.md</code> — Python del editor UE
-              </li>
-            </ul>
-            <p className="mt-8 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Esta app no sustituye la documentación oficial: usa los enlaces dentro de cada archivo para
-              la versión exacta instalada en producción.
-            </p>
+          <section className="hud-panel p-8">
+            <h2 className="text-xl font-black mb-6">ARCHIVOS_HISTÓRICOS</h2>
+            <div className="grid gap-6 text-sm">
+                <div className="border-l-2 border-[rgb(var(--accent))] pl-4">
+                    <h4 className="font-bold mb-1 opacity-50">UBICACIÓN:</h4>
+                    <code className="text-xs">docs/api-references/</code>
+                </div>
+                <ul className="space-y-4 font-mono text-xs">
+                    <li className="flex items-center gap-2">
+                        <span className="text-[rgb(var(--accent))]">{'>'}</span>
+                        <span>maya.md — ENTORNO_DCC_MAYA</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                        <span className="text-[rgb(var(--accent))]">{'>'}</span>
+                        <span>blender.md — ENTORNO_DCC_BLENDER</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                        <span className="text-[rgb(var(--accent))]">{'>'}</span>
+                        <span>unreal-engine.md — ENTORNO_DCC_UNREAL</span>
+                    </li>
+                </ul>
+            </div>
           </section>
         )}
       </main>
 
-      <footer className="mx-auto mt-12 max-w-6xl border-t border-zinc-200 px-6 py-8 text-center text-xs text-zinc-500 dark:border-zinc-800">
-        Datos del catálogo en <code>localStorage</code>; exporta JSON para backup o para versionar en git.
+      <footer className="mx-auto mt-12 max-w-6xl border-t border-[rgba(0,255,242,0.1)] px-6 py-8 text-center">
+        <p className="text-[10px] font-mono text-[rgb(var(--accent))] opacity-30">
+          PERSISTENCIA_LOCAL_HABILITADA // ID_TRANSMISIÓN_ENCRIPTADA: {uptime}-{cpu}-XYZ
+        </p>
       </footer>
     </div>
   )
@@ -641,9 +541,9 @@ function Field(props: {
 }) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-xs font-medium text-zinc-500">{props.label}</span>
+      <span className="text-[10px] font-bold text-[rgb(var(--accent))] opacity-70">{props.label}</span>
       <input
-        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+        className="px-3 py-2 text-sm font-mono"
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
       />
