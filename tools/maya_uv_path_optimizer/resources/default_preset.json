@@ -1,0 +1,7 @@
+{
+  "overlapThreshold": 0.05,
+  "uvBounds": "0-1",
+  "strategy": "auto",
+  "safeMode": true,
+  "dryRunRequired": true
+}

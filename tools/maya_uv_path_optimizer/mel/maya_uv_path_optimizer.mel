@@ -1,0 +1,4 @@
+global proc mayaUvPathOptimizer()
+{
+    python("from tools.maya_uv_path_optimizer.ui.window import show; show()");
+}
